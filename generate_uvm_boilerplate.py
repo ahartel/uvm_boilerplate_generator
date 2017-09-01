@@ -1,4 +1,5 @@
 import os
+import sys
 import argparse
 
 parser = argparse.ArgumentParser(description='Generate UVM boilerplate code.')
@@ -13,6 +14,15 @@ args = parser.parse_args()
 long_name = args.long
 short_name = args.short
 target_dir = args.target
+if not os.path.isdir(target_dir):
+    print("Target directory {0} does not exist.".format(target_dir))
+    resp = raw_input("Create it? [y to create, other to abort]")
+    if resp == 'y':
+        print("Creating {0}.".format(target_dir))
+        os.makedirs(target_dir)
+    else:
+        print("Aborting")
+        sys.exit(1)
 
 templates = []
 makefiles = []
