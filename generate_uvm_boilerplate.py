@@ -297,14 +297,14 @@ class {0}_monitor_before extends uvm_monitor;
     integer counter_mon = 0, state = 0;
 
     {0}_transaction {1}_tx;
-    {1}_tx = {0}_transaction::type_id::create(.name("{1}_tx"), .contxt(get_full_name()));
 
     //forever begin
       //@(posedge vif.sig_clock)
-
-      // modify {1}_tx
-
-      // mon_ap_before.write({1}_tx);
+        // if something happens begin
+        //   {1}_tx = new();
+        //   modify {1}_tx
+        //   mon_ap_before.write({1}_tx);
+        // end
     //end
   endtask: run_phase
 endclass: {0}_monitor_before
