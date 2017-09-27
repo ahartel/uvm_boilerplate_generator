@@ -89,6 +89,8 @@ class {0}_test extends uvm_test;
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
+
+    uvm_resource_db#(int)::set(.scope("params"), .name("num_transactions"), .val(15));
   endfunction: new
 
   function void build_phase(uvm_phase phase);
@@ -176,7 +178,6 @@ scoreboard_string = """
 `uvm_analysis_imp_decl(_after)
 
 class {0}_scoreboard extends uvm_scoreboard;
-  `uvm_component_utils({0}_scoreboard)
 
   uvm_analysis_export #({0}_transaction) sb_export_before;
   uvm_analysis_export #({0}_transaction) sb_export_after;
@@ -187,11 +188,21 @@ class {0}_scoreboard extends uvm_scoreboard;
   {0}_transaction transaction_before;
   {0}_transaction transaction_after;
 
+  int repetitions;
+  bit count_tx_enable;
+
+  `uvm_component_utils_begin({0}_scoreboard)
+    `uvm_field_int(count_tx_enable, UVM_ALL_ON)
+  `uvm_component_utils_end
+
   function new(string name, uvm_component parent);
     super.new(name, parent);
 
     transaction_before= new("transaction_before");
     transaction_after= new("transaction_after");
+
+    repetitions = 0;
+    count_tx_enable = 0;
   endfunction: new
 
   function void build_phase(uvm_phase phase);
@@ -209,6 +220,22 @@ class {0}_scoreboard extends uvm_scoreboard;
     sb_export_after.connect(after_fifo.analysis_export);
   endfunction: connect_phase
 
+  function void check_phase(uvm_phase phase);
+    int num_transactions;
+
+    void'(uvm_resource_db#(int)::read_by_name
+	  (.scope("params"), .name("num_transactions"), .val(num_transactions)));
+
+    if (count_tx_enable) begin
+	    assert (repetitions==num_transactions)
+      	      else `uvm_error("{1}_scoreboard",
+			      $sformatf("Not all transactions have been compared %0d of %0d.",
+					repetitions,
+					num_transactions)
+			      );
+    end
+  endfunction // check_phase
+
   task run();
     forever begin
       before_fifo.get(transaction_before);
@@ -219,10 +246,11 @@ class {0}_scoreboard extends uvm_scoreboard;
   endtask: run
 
   virtual function void compare();
+    repetitions = repetitions + 1;
     if(transaction_before.equals(transaction_after)) begin
       `uvm_info("compare", {{"Test: OK!"}}, UVM_LOW);
     end else begin
-      `uvm_info("compare", {{"Test: Fail!"}}, UVM_LOW);
+      `uvm_fatal("compare", {{"Test: Fail!"}});
     end
   endfunction: compare
 endclass: {0}_scoreboard
@@ -391,6 +419,8 @@ endclass: {0}_transaction
 class {0}_sequence extends uvm_sequence#({0}_transaction);
   `uvm_object_utils({0}_sequence)
 
+  int repetitions;
+
   function new(string name = "");
     super.new(name);
   endfunction: new
@@ -398,8 +428,11 @@ class {0}_sequence extends uvm_sequence#({0}_transaction);
   task body();
     {0}_transaction {1}_tx;
 
+    void'(uvm_resource_db#(int)::read_by_name
+	  (.scope("params"), .name("num_transactions"), .val(repetitions)));
+
     //// CHANGEME ////
-    repeat(15) begin
+    repeat(repetitions) begin
       {1}_tx = {0}_transaction::type_id::create(.name("{1}_tx"), .contxt(get_full_name()));
 
       start_item({1}_tx);
@@ -433,7 +466,7 @@ IRUN = irun -uvmhome CDNS-1.2 -incdir $(SRC) \
 	+define+UVM_OBJECT_MUST_HAVE_CONSTRUCTOR -l irun.log \
 	+UVM_VERBOSITY=$(UVM_VERBOSITY) -timescale 1ns/1ns \
 	+UVM_TESTNAME=$(TEST) +UVM_TR_RECORD +UVM_LOG_RECORD \
-	-top $(TB) -ACCESS +rwc #-gui
+	-top $(TB) -ACCESS +rwc -coverage U -covoverwrite #-gui
 
 x:	run
 
